@@ -16,6 +16,26 @@
  *         -3 if the archive contains a header with an invalid checksum value
  */
 int check_archive(int tar_fd) {
+
+    int end_of_tar()
+    //Check magic value
+    lseek(tar_fd, 257, SEEK_SET);
+    char magic[TMAGLEN];
+    if (read(tar_fd, &magic, TMAGLEN) == -1) fprintf(stderr, "read failed, errno = %d\n", errno);
+    if (magic != TMAGIC) return -1;
+
+    //Check version value
+    lseek(tar_fd, 6, SEEK_CUR);
+    char version[TVERSLEN];
+    if (read(tar_fd, &version, TVERSLEN) == -1) fprintf(stderr, "read failed, errno = %d\n", errno);
+    if (version != TVERSION) return -2;
+
+    //Check checksum
+    lseek(tar_fd, 148, SEEK_SET);
+    char chksum[8];
+    if (read(tar_fd, &chksum, 8) == -1) fprintf(stderr, "read failed, errno = %d\n", errno);
+    if (chksum  ???) return -3;
+
     return 0;
 }
 
