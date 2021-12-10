@@ -35,9 +35,26 @@ int main(int argc, char **argv) {
         perror("open(tar_file)");
         return -1;
     }
-
+    // Tests for check_archive()
     int ret = check_archive(fd);
     printf("check_archive returned %d\n", ret);
+
+    // Tests for exists()
+    ret = exists(fd,"hints.txt");
+    printf("check hints.txt %d\n", ret);
+    ret = exists(fd,"lib_tar.c");
+    printf("check lib_tar.c %d\n", ret);
+    ret = exists(fd,"myfolder/");
+    printf("check myfolder/ %d\n", ret);
+    ret = exists(fd,"myfolder/README.md");
+    printf("check myfolder/README.md %d\n", ret);
+    ret = exists(fd,"myfolder/tests.c");
+    printf("check myfolder/tests.c %d\n", ret);
+
+    ret = exists(fd,"nothing");
+    printf("check nothing %d\n", ret);
+    ret = exists(fd,"falsetest.txt");
+    printf("check falsetest.txt %d\n", ret);
 
     return 0;
 }

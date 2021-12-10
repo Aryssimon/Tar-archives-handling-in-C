@@ -1,5 +1,14 @@
 #include "lib_tar.h"
 
+int at_end_of_archive(int tar_fd) {
+    char block[1024];
+    if (read(tar_fd, &block, 1024) == -1) fprintf(stderr, "read failed, errno = %d\n", errno);
+    for (int i = 0; i < 1024; i++) {
+      if (block[i] != '\0') return 0;
+    }
+    return 1;
+}
+
 /**
  * Checks whether the archive is valid.
  *
@@ -16,25 +25,51 @@
  *         -3 if the archive contains a header with an invalid checksum value
  */
 int check_archive(int tar_fd) {
+    lseek(tar_fd,0,SEEK_SET);
+    unsigned int atSize = 0;
+    while (at_end_of_archive(tar_fd) == 0) {
+        char name[100];
+        lseek(tar_fd,atSize,SEEK_SET);
+        if (read(tar_fd, &name, 100) == -1) fprintf(stderr, "read failed, errno = %d\n", errno);
+        printf("%s\n", name);
 
-    int end_of_tar()
-    //Check magic value
-    lseek(tar_fd, 257, SEEK_SET);
-    char magic[TMAGLEN];
-    if (read(tar_fd, &magic, TMAGLEN) == -1) fprintf(stderr, "read failed, errno = %d\n", errno);
-    if (magic != TMAGIC) return -1;
 
-    //Check version value
-    lseek(tar_fd, 6, SEEK_CUR);
-    char version[TVERSLEN];
-    if (read(tar_fd, &version, TVERSLEN) == -1) fprintf(stderr, "read failed, errno = %d\n", errno);
-    if (version != TVERSION) return -2;
+        //Check magic value
+        lseek(tar_fd, atSize+257, SEEK_SET);
+        char magic[TMAGLEN];
+        if (read(tar_fd, &magic, TMAGLEN) == -1) fprintf(stderr, "read failed, errno = %d\n", errno);
+        if (strcmp(magic, TMAGIC) != 0) return -1;
 
-    //Check checksum
-    lseek(tar_fd, 148, SEEK_SET);
-    char chksum[8];
-    if (read(tar_fd, &chksum, 8) == -1) fprintf(stderr, "read failed, errno = %d\n", errno);
-    if (chksum  ???) return -3;
+        //Check version value
+        char version[TVERSLEN];
+        if (read(tar_fd, &version, TVERSLEN) == -1) fprintf(stderr, "read failed, errno = %d\n", errno);
+        if (strncmp(version, TVERSION, TVERSLEN) != 0) return -2;
+
+        //Check checksum
+        char header[512];
+        lseek(tar_fd, atSize, SEEK_SET);
+        if (read(tar_fd, &header, 512) == -1) fprintf(stderr, "read failed, errno = %d\n", errno);
+        unsigned int chksumCounter = 0;
+        for (int i = 0; i < 512; i++) {
+            if (i >= 148 && i < 156)  chksumCounter += (unsigned int) ' ';
+            else {
+                chksumCounter += (unsigned int) header[i];
+            }
+        }
+
+        lseek(tar_fd, atSize+148, SEEK_SET);
+        char chksum[8];
+        if (read(tar_fd, &chksum, 8) == -1) fprintf(stderr, "read failed, errno = %d\n", errno);
+        if (TAR_INT(chksum) != chksumCounter) return -3;
+
+        //Go to next header
+        char size[12];
+        lseek(tar_fd, atSize+124, SEEK_SET);
+        if (read(tar_fd, &size, 12) == -1) fprintf(stderr, "read failed, errno = %d\n", errno);
+        unsigned int fileSize = 512+(512*((TAR_INT(size)/512)+(TAR_INT(size)%512 != 0)));
+        atSize += fileSize;
+        lseek(tar_fd, atSize, SEEK_SET);
+    }
 
     return 0;
 }
@@ -49,6 +84,21 @@ int check_archive(int tar_fd) {
  *         any other value otherwise.
  */
 int exists(int tar_fd, char *path) {
+    lseek(tar_fd,0,SEEK_SET);
+    unsigned int atSize = 0;
+    while(at_end_of_archive(tar_fd) == 0){
+        char name[100];
+        lseek(tar_fd,atSize,SEEK_SET);
+        if (read(tar_fd, &name, 100) == -1) fprintf(stderr, "read failed, errno = %d\n", errno);
+        if (strcmp(name, path) == 0) return 1;
+
+        char size[12];
+        lseek(tar_fd, atSize+124, SEEK_SET);
+        if (read(tar_fd, &size, 12) == -1) fprintf(stderr, "read failed, errno = %d\n", errno);
+        unsigned int fileSize = 512+(512*((TAR_INT(size)/512)+(TAR_INT(size)%512 != 0)));
+        atSize += fileSize;
+        lseek(tar_fd, atSize, SEEK_SET);
+    }
     return 0;
 }
 
@@ -62,6 +112,7 @@ int exists(int tar_fd, char *path) {
  *         any other value otherwise.
  */
 int is_dir(int tar_fd, char *path) {
+    exists(tar_fd, path);
     return 0;
 }
 
